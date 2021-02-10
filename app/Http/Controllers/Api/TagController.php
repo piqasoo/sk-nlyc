@@ -16,134 +16,118 @@ class TagController extends Controller
         $sort = 'article_count';
         $order = 'desc';
 
-        /*
-        ** Merge parameters
-        */
-        if(isset($request['sort']) && in_array($request['sort'], ['article_count', 'created_at'])){
-            $sort = $request['sort'];
+        try {
+
+            $this->validate($request, [
+                'sort'      => 'nullable|string|in:article_count,created_at',
+                'order'     => 'nullable|string|in:asc,desc',
+            ]);
+            /*
+            ** Merge parameters
+            */
+            if(isset($request['sort'])){
+                $sort = $request['sort'];
+            }
+            if(isset($request['order'])){
+                $order = $request['order'];
+            }  
+            
+            /*
+            ** Query Data
+            ** with related model 
+            ** Sort data
+            ** get data
+            */
+            $data = Tag::Query()
+                    ->withCount('article')
+                    ->orderBy($sort, $order)
+                    ->get();
+
+            /*
+            ** @return json response
+            */
+            $response = [
+                'records'   => count($data),
+                'data'      => $data];
+            return response($response, 200)->header('Content-Type', 'application/json');
+        } catch (\Throwable $th) {
+            //throw $th;
+            return response(['message' => $th->getMessage()], 400)->header('Content-Type', 'application/json');
         }
-        if(isset($request['order']) && in_array($request['order'], ['asc', 'desc'])){
-            $order = $request['order'];
-        }        
 
-        /*
-        ** Get Data
-        */
-        $data = Tag::get();
-
-        /*
-        ** Order Data
-        */
-        if($order != 'desc'){
-            $data = $data->sortBy($sort);
-        }else{
-            $data = $data->sortByDesc($sort);
-        }
-
-        /*
-        ** return data without keys
-        */
-        $data = array_values($data->toArray());
-
-        /*
-        ** @return json response
-        */
-        return response()->json([
-            'statusCode' => count($data) ? 200 : 400,
-            'records'   => count($data),
-            'data' => $data]);
+        
     }
 
     public function getTagArticles(Request $request, $id){
-
         /*
         ** Default parameters
         */
         $sort = 'created_at';
         $order = 'desc';
         $paginate = null;
-        $offset = 0;
         $page = 1;
         $limit = 10;
 
-        /*
-        ** Merge parameters
-        */
-        if(isset($request['sort']) && in_array($request['sort'], ['view_count', 'comment_count', 'created_at'])){
-            $sort = $request['sort'];
-        }
-        if(isset($request['order']) && in_array($request['order'], ['asc', 'desc'])){
-            $order = $request['order'];
-        }
-        if(isset($request['paginate'])){
-            $paginate = intval($request['paginate']);
-        }
-        if(isset($request['limit'])){
-            $limit = intval($request['limit']);
-        }
+        try {
+            $this->validate($request, [
+                'sort'      => 'nullable|string|in:view_count,comment_count,created_at',
+                'order'     => 'nullable|string|in:asc,desc',
+                'paginate'  => 'nullable|boolean',
+                'limit'     => 'nullable|numeric',
+                'page'      => 'nullable|numeric',
+            ]);
 
-        if(isset($request['page'])){
-            $page = intval($request['page']);
-            if($page > 1){
-                $offset = ($page - 1) * $limit;
+            /*
+            ** Merge parameters
+            */
+            if(isset($request['sort'])){
+                $sort = $request['sort'];
             }
-        }
-
-        if($id){
-            /*
-            ** @param $id
-            ** Get Main Data
-            */
-            $data = Tag::find($id);
-
-            /*
-            ** @return json 404 response
-            */
-            if(!$data){
-                return response()->json([
-                    'statusCode' => 404,
-                    'data' => []
-                ]);
+            if(isset($request['order'])){
+                $order = $request['order'];
+            }
+            if(isset($request['paginate'])){
+                $paginate = $request['paginate'];
+            }
+            if(isset($request['limit'])){
+                $limit = $request['limit'];
+            }
+            if(isset($request['page'])){
+                $page = $request['page'];
             }
 
+            $tag = Tag::findOrFail($id);
             /*
-            ** Get Related Data
+            ** Query Data
+            ** with related model 
+            ** Sort data
             */
-            $articles = $data->Articles()->get();
+            $data = $tag->Article()
+                        ->withCount('comment')
+                        ->orderBy($sort, $order);
 
             /*
-            ** Order Related Data
-            */
-            if($order != 'desc'){
-                $articles = $articles->sortBy($sort);
-            }else{
-                $articles = $articles->sortByDesc($sort);
-            }
-
-            /*
-            ** Paginate Related Data
+            ** Get Data
             */
             if($paginate){
-                $articles = collect($articles)->slice($offset, $limit);
+                $data = $data->simplePaginate($limit);
+            }else{
+                $data = $data->get();
             }
-
-            /*
-            ** Return related data without keys
-            */
-            $articles = array_values($articles->toArray());
-
+            
             /*
             ** @return json response
             */
-            return response()->json([
-                'statusCode'        => count($articles) ? 200 : 400,
-                'tag_id'            => $data->id,
-                'paginate' => $paginate ? [
-                    'page'      => $page,
-                    'per_page'  => $limit,
-                ] : false,
-                'articles_count'    => count($data->Articles()->get()),
-                'data'              => $articles]);
+            $response = [
+                'tag_id'            => $tag->id,
+                'articles_count'    => count($tag->Article()->get()),
+                'data'              => $data
+            ];
+            return response($response, 200)->header('Content-Type', 'application/json');
+            
+        } catch (\Throwable $th) {
+            //throw $th;
+            return response(['message' => $th->getMessage()], 400)->header('Content-Type', 'application/json');
         }
     } 
 }

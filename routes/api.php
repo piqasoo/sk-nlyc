@@ -2,6 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\ArticleController;
+use App\Http\Controllers\Api\TagController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,8 +19,14 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
 });
-Route::get('/articles', 'Api\ArticleController@getAll');
-Route::get('/articles/{id}/comments', 'Api\ArticleController@getArticleComments');
 
-Route::get('/tags', 'Api\TagController@getAll');
-Route::get('/tags/{id}/articles', 'Api\TagController@getTagArticles');
+Route::get('/articles', [ArticleController::class, 'getAll']);
+Route::get('/articles/{article}/comments', [ArticleController::class, 'getArticleComments']);
+
+Route::get('/tags', [TagController::class, 'getAll']);
+Route::get('/tags/{id}/articles', [TagController::class, 'getTagArticles']);
+
+Route::fallback(function(){
+    $msg = ['message' => 'Page Not Found.'];
+    return response($msg, 404)->header('Content-Type', 'application/json');
+});
